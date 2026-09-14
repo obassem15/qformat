@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QFormat — Question Formatter &amp; PDF Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/3.0.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg-void:#0b0d10;
+    --bg-panel:#14171c;
+    --bg-panel-2:#191d23;
+    --bg-input:#0f1216;
+    --border:#262b31;
+    --border-soft:#1d2126;
+    --text-primary:#e6e8eb;
+    --text-muted:#8a9099;
+    --text-dim:#565c66;
+    --accent:#2dd4a7;
+    --accent-dim:#1a5d4c;
+    --warn:#e0a63a;
+    --doc-title-color:#0b3c5d;
+    --doc-section-color:#0b3c5d;
+    --doc-question-color:#0077b6;
+    --doc-answer-color:#0e7c61;
+    --doc-note-color:#b25400;
+    --doc-font:'Poppins', sans-serif;
+    --doc-title-size:26px;
+    --doc-question-size:15px;
+    --doc-answer-size:13px;
+    --doc-gap:22px;
+    --doc-line-height:1.55;
+    --content-pad-lr:18mm;
+    --content-pad-top:22mm;
+    --content-pad-bottom:20mm;
+    --page-w:210mm;
+    --page-h:297mm;
+    --page-bg:#ffffff;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg-void);
+    color:var(--text-primary);
+    font-family:'JetBrains Mono', monospace;
+    font-size:13px;
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+    overflow:hidden;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--bg-panel);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+  .brand{display:flex;align-items:baseline;gap:8px;margin-right:8px;}
+  .brand .mark{color:var(--accent);font-weight:700;font-size:16px;letter-spacing:0.02em;}
+  .brand .tag{color:var(--text-dim);font-size:11px;}
+  .topbar input[type="text"]{background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-family:inherit;font-size:12px;padding:7px 10px;border-radius:4px;width:170px;}
+  select{background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-family:inherit;font-size:12px;padding:7px 8px;border-radius:4px;}
+  .btn{background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);font-family:inherit;font-size:12px;padding:7px 12px;border-radius:4px;cursor:pointer;white-space:nowrap;transition:border-color .12s, color .12s;}
+  .btn:hover{border-color:var(--accent);color:var(--accent);}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#06231c;font-weight:600;}
+  .btn.primary:hover{opacity:.9;color:#06231c;}
+  .btn.small{padding:5px 8px;font-size:11px;}
+  .spacer{flex:1;}
+  .mode-toggle{display:flex;border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+  .mode-toggle button{background:var(--bg-input);border:none;color:var(--text-muted);font-family:inherit;font-size:11px;padding:7px 12px;cursor:pointer;}
+  .mode-toggle button.active{background:var(--accent-dim);color:var(--accent);}
+
+  /* ---------- Workspace ---------- */
+  .workspace{flex:1;display:grid;grid-template-columns:340px 1fr 300px;min-height:0;}
+  @media (max-width:1050px){.workspace{grid-template-columns:1fr;overflow-y:auto;}.editor-pane,.inspector-pane{min-height:400px;}}
+
+  .editor-pane{display:flex;flex-direction:column;border-right:1px solid var(--border);min-height:0;}
+  .pane-label{padding:9px 14px;font-size:11px;letter-spacing:.03em;color:var(--text-dim);border-bottom:1px solid var(--border-soft);background:var(--bg-panel-2);flex-shrink:0;}
+  textarea#source{flex:1;background:var(--bg-input);border:none;outline:none;color:var(--text-primary);font-family:'JetBrains Mono', monospace;font-size:12.5px;line-height:1.6;padding:14px;resize:none;}
+  .stats-bar{display:flex;gap:16px;padding:9px 14px;background:var(--bg-panel-2);border-top:1px solid var(--border-soft);font-size:11px;color:var(--text-muted);flex-shrink:0;flex-wrap:wrap;}
+  .stats-bar b{color:var(--text-primary);}
+
+  /* ---------- Preview ---------- */
+  .preview-pane{
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+    background:
+      radial-gradient(circle at 1px 1px, #1a1e24 1px, transparent 0) 0 0/16px 16px,
+      var(--bg-void);
+  }
+  .preview-scroll{
+    flex:1;
+    overflow:auto;
+    display:flex;
+    justify-content:center;
+    padding:28px 20px;
+  }
+  #printArea{
+    width:100%;
+    display:flex;
+    justify-content:center;
+  }
+  #pages{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:28px;
+    width:100%;
+    max-width:none;
+  }
+
+  /* =========================================================
+     REAL INDIVIDUAL PAGE
+     ========================================================= */
+  .paper{
+    position:relative;
+    width:var(--page-w);
+    height:var(--page-h);
+    min-height:var(--page-h);
+    max-height:var(--page-h);
+    box-sizing:border-box;
+    flex:none;
+    background:var(--page-bg);
+    box-shadow:0 12px 40px rgba(0,0,0,.55);
+    padding-top:var(--content-pad-top);
+    padding-bottom:var(--content-pad-bottom);
+    padding-left:var(--content-pad-lr);
+    padding-right:var(--content-pad-lr);
+    color:#1a1a1a;
+    font-family:var(--doc-font);
+    line-height:var(--doc-line-height);
+    overflow:hidden;
+  }
+  .paper:last-child{
+    break-after:auto;
+    page-break-after:auto;
+  }
+
+  .page-content{
+    position:relative;
+    z-index:1;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+  }
+  .page-content > *{position:relative;z-index:1;}
+
+  .page-decoration{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    pointer-events:none;
+    z-index:0;
+    overflow:hidden;
+  }
+  .page-decoration svg{display:block;width:100%;height:100%;}
+
+  /* ---------- Document content ---------- */
+  .pagination-unit{display:block;width:100%;break-inside:avoid;page-break-inside:avoid;}
+  .pagination-unit > .doc-block{break-inside:avoid;page-break-inside:avoid;}
+
+  .doc-title{color:var(--doc-title-color);font-size:var(--doc-title-size);font-weight:700;text-align:center;margin:0 0 22px 0;}
+  .doc-section{color:var(--doc-section-color);font-weight:700;font-size:calc(var(--doc-question-size) + 2px);margin:26px 0 12px 0;padding-bottom:6px;border-bottom:2px solid var(--doc-section-color);break-inside:avoid;page-break-inside:avoid;break-after:avoid;page-break-after:avoid;}
+  .doc-block{margin-bottom:var(--doc-gap);break-inside:avoid;page-break-inside:avoid;-webkit-column-break-inside:avoid;}
+  .doc-question,.doc-choices,.doc-answer{break-inside:avoid;page-break-inside:avoid;}
+  .doc-question{color:var(--doc-question-color);font-size:var(--doc-question-size);font-weight:600;margin:0 0 6px 0;}
+  .doc-question .q-num{font-weight:700;margin-right:5px;}
+  .doc-question .q-num::after{content:".";}
+  .doc-answer{color:var(--doc-answer-color);font-size:var(--doc-answer-size);margin:6px 0 0 4px;}
+  .doc-answer .lbl{font-weight:700;font-style:italic;}
+  .doc-choices{list-style:none;margin:2px 0 2px 4px;padding:0;}
+  .doc-choices li{display:block;margin:0 0 6px 0;padding-left:24px;position:relative;font-size:var(--doc-answer-size);color:#242424;break-inside:avoid;}
+  .doc-choices li:last-child{margin-bottom:0;}
+  .doc-choices .choice-letter{position:absolute;left:0;top:0;font-weight:700;color:var(--doc-question-color);}
+  .doc-answerkey{margin-top:34px;break-inside:avoid;page-break-inside:avoid;}
+  .doc-answer-item{color:var(--doc-answer-color);font-size:var(--doc-answer-size);margin:0 0 8px 4px;break-inside:avoid;}
+  .doc-answer-item b{font-weight:700;}
+  .doc-note{background:#fff8ec;border-left:3px solid var(--doc-note-color);color:var(--doc-note-color);font-size:calc(var(--doc-answer-size) - 1px);padding:8px 10px;margin-bottom:var(--doc-gap);break-inside:avoid;}
+  .doc-keyterm{display:inline-block;background:#eef6ff;border:1px solid var(--doc-question-color);color:var(--doc-question-color);font-size:calc(var(--doc-question-size) - 2px);font-weight:700;padding:3px 10px;border-radius:3px;margin-bottom:6px;}
+  .doc-keyfact{background:#f2fbf6;border-left:3px solid var(--doc-answer-color);color:#1a1a1a;font-size:calc(var(--doc-answer-size) - 1px);padding:8px 10px;margin-bottom:var(--doc-gap);break-inside:avoid;}
+  .doc-keyfact b{color:var(--doc-answer-color);}
+  .doc-text{font-size:var(--doc-answer-size);color:#333;margin-bottom:var(--doc-gap);}
+  .empty-hint{color:#9aa0a8;font-size:13px;text-align:center;padding:60px 20px;font-family:'Poppins',sans-serif;}
+
+  /* =========================================================
+     PAGE LAYOUT TEMPLATES
+     ========================================================= */
+  .paper.layout-classic .doc-block{}
+  .paper.layout-boxed .doc-block{border:1px solid #e4e6ea;border-radius:10px;padding:14px 16px 12px 16px;background:#fbfbfd;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  .paper.layout-boxed .doc-section{border-radius:6px;}
+  .paper.layout-boxed .doc-note,.paper.layout-boxed .doc-keyfact{border-radius:0 8px 8px 0;}
+  .paper.layout-numbered .doc-block{position:relative;padding:2px 0 2px 38px;}
+  .paper.layout-numbered .doc-question{margin-top:1px;}
+  .paper.layout-numbered .doc-question .q-num{position:absolute;left:0;top:-1px;width:24px;height:24px;line-height:24px;text-align:center;border-radius:50%;background:var(--doc-question-color);color:#fff;font-size:12px;font-weight:700;}
+  .paper.layout-numbered .doc-question .q-num::after{content:"";}
+  .paper.layout-numbered .doc-choices{margin-left:0;}
+  .paper.layout-numbered .doc-choices li{padding-left:22px;}
+  .paper.layout-modern .doc-block{border-left:4px solid var(--doc-question-color);padding:11px 14px;background:#f6f8fa;border-radius:0 7px 7px 0;}
+  .paper.layout-modern .doc-section{color:#fff;background:var(--doc-section-color);border:0;border-radius:6px;padding:8px 14px;margin:24px 0 14px;}
+  .paper.layout-modern .doc-choices{background:rgba(255,255,255,.78);border-radius:4px;padding:6px 10px;margin:7px 0 0;}
+  .paper.layout-academic .doc-title{border-bottom:2px solid var(--doc-title-color);padding-bottom:10px;}
+  .paper.layout-academic .doc-section{border-bottom:3px double var(--doc-section-color);text-transform:uppercase;letter-spacing:.04em;}
+  .paper.layout-academic .doc-block{border-left:2px solid #c9c9c9;padding-left:10px;margin-bottom:calc(var(--doc-gap) + 4px);}
+  .paper.layout-academic .doc-choices{margin-left:8px;}
+  .paper.layout-compact .doc-block{margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #e9e9e9;}
+  .paper.layout-compact .doc-block:last-child{border-bottom:none;}
+  .paper.layout-compact .doc-question{font-size:calc(var(--doc-question-size) - 1px);margin-bottom:3px;}
+  .paper.layout-compact .doc-choices{margin:1px 0 0 4px;}
+  .paper.layout-compact .doc-choices li{font-size:calc(var(--doc-answer-size) - 1px);margin-bottom:3px;padding-left:20px;}
+  .paper.layout-compact .doc-section{margin:16px 0 8px;font-size:var(--doc-question-size);padding-bottom:4px;}
+
+  /* ---------- Inspector ---------- */
+  .inspector-pane{border-left:1px solid var(--border);overflow-y:auto;min-height:0;}
+  .insp-section{padding:14px;border-bottom:1px solid var(--border-soft);}
+  .insp-section h4{margin:0 0 10px 0;font-size:11px;letter-spacing:.03em;color:var(--text-dim);text-transform:uppercase;font-weight:600;}
+  .theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .theme-swatch{display:flex;align-items:center;gap:7px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;padding:7px 8px;cursor:pointer;font-size:10.5px;color:var(--text-muted);}
+  .theme-swatch:hover{border-color:var(--accent);}
+  .theme-swatch.active{border-color:var(--accent);color:var(--text-primary);}
+  .theme-swatch .dots{display:flex;gap:2px;}
+  .theme-swatch .dot{width:8px;height:8px;border-radius:50%;}
+
+  .layout-grid{display:grid;grid-template-columns:1fr;gap:8px;}
+  .layout-swatch{display:flex;align-items:center;gap:9px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;padding:8px 9px;cursor:pointer;font-size:11px;color:var(--text-muted);}
+  .layout-swatch:hover{border-color:var(--accent);}
+  .layout-swatch.active{border-color:var(--accent);color:var(--text-primary);}
+  .layout-swatch .mini{flex-shrink:0;width:40px;height:26px;border-radius:3px;background:#20242b;border:1px solid var(--border);position:relative;overflow:hidden;}
+  .layout-swatch .mini span{position:absolute;background:var(--accent-dim);display:block;}
+  .layout-swatch[data-layout="classic"] .mini span:nth-child(1){top:5px;left:5px;right:5px;height:3px;}
+  .layout-swatch[data-layout="classic"] .mini span:nth-child(2){top:12px;left:5px;right:12px;height:3px;opacity:.6;}
+  .layout-swatch[data-layout="classic"] .mini span:nth-child(3){top:18px;left:5px;right:18px;height:3px;opacity:.6;}
+  .layout-swatch[data-layout="boxed"] .mini span:nth-child(1){top:4px;left:4px;right:4px;bottom:4px;border:1px solid var(--accent);background:none;border-radius:2px;}
+  .layout-swatch[data-layout="numbered"] .mini span:nth-child(1){top:5px;left:5px;width:8px;height:8px;border-radius:50%;}
+  .layout-swatch[data-layout="numbered"] .mini span:nth-child(2){top:6px;left:16px;right:5px;height:3px;opacity:.8;}
+  .layout-swatch[data-layout="numbered"] .mini span:nth-child(3){top:14px;left:16px;right:10px;height:3px;opacity:.5;}
+  .layout-swatch[data-layout="modern"] .mini span:nth-child(1){top:4px;bottom:4px;left:5px;width:3px;}
+  .layout-swatch[data-layout="modern"] .mini span:nth-child(2){top:6px;left:12px;right:5px;height:3px;opacity:.8;}
+  .layout-swatch[data-layout="modern"] .mini span:nth-child(3){top:14px;left:12px;right:10px;height:3px;opacity:.5;}
+  .layout-swatch[data-layout="academic"] .mini span:nth-child(1){top:5px;left:5px;right:5px;height:2px;}
+  .layout-swatch[data-layout="academic"] .mini span:nth-child(2){top:10px;bottom:5px;left:6px;width:2px;opacity:.7;}
+  .layout-swatch[data-layout="academic"] .mini span:nth-child(3){top:14px;left:12px;right:6px;height:2px;opacity:.5;}
+  .layout-swatch[data-layout="compact"] .mini span:nth-child(1){top:5px;left:5px;right:5px;height:2px;}
+  .layout-swatch[data-layout="compact"] .mini span:nth-child(2){top:11px;left:5px;right:8px;height:2px;opacity:.7;}
+  .layout-swatch[data-layout="compact"] .mini span:nth-child(3){top:16px;left:5px;right:12px;height:2px;opacity:.5;}
+
+  .help-panel{background:var(--bg-panel-2);}
+  .help-panel h4{color:var(--accent);}
+  .help-list{list-style:none;margin:0 0 12px 0;padding:0;display:flex;flex-direction:column;gap:9px;}
+  .help-list li{font-size:11px;color:var(--text-muted);line-height:1.5;}
+  .help-list code{display:inline-block;background:var(--bg-input);border:1px solid var(--border);color:var(--accent);font-family:'JetBrains Mono', monospace;font-size:10.5px;padding:1px 5px;border-radius:3px;margin-bottom:2px;}
+  .help-list span.desc{display:block;color:var(--text-muted);}
+  .help-note{font-size:10.5px;color:var(--text-dim);margin:0 0 12px 0;line-height:1.5;}
+  .btn.copy-example{width:100%;justify-content:center;display:flex;align-items:center;gap:6px;}
+  .btn.copy-example.copied{border-color:var(--accent);color:var(--accent);}
+
+  .deco-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+  .deco-swatch{display:flex;align-items:center;gap:8px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;padding:7px 8px;cursor:pointer;font-size:10.5px;color:var(--text-muted);}
+  .deco-swatch:hover{border-color:var(--accent);}
+  .deco-swatch.active{border-color:var(--accent);color:var(--text-primary);}
+  .deco-swatch .mini{flex-shrink:0;width:34px;height:24px;border-radius:3px;background:#20242b;border:1px solid var(--border);box-sizing:border-box;}
+  .deco-mini-none{opacity:.35;border-style:dashed !important;}
+  .deco-mini-minimal{box-shadow:inset 0 0 0 2px var(--accent);}
+  .deco-mini-double{border:2px solid var(--accent);outline:1px solid var(--accent);outline-offset:-5px;}
+  .deco-mini-academic{border:3px double var(--accent);}
+  .deco-mini-modern{border:1px solid var(--accent);border-top-width:5px;}
+  .deco-mini-rounded{border:2px solid var(--accent);border-radius:9px;}
+  .deco-mini-corners{border:1px solid var(--border);background:linear-gradient(var(--accent),var(--accent)) top left/9px 2px no-repeat,linear-gradient(var(--accent),var(--accent)) top left/2px 9px no-repeat,linear-gradient(var(--accent),var(--accent)) top right/9px 2px no-repeat,linear-gradient(var(--accent),var(--accent)) top right/2px 9px no-repeat,linear-gradient(var(--accent),var(--accent)) bottom left/9px 2px no-repeat,linear-gradient(var(--accent),var(--accent)) bottom left/2px 9px no-repeat,linear-gradient(var(--accent),var(--accent)) bottom right/9px 2px no-repeat,linear-gradient(var(--accent),var(--accent)) bottom right/2px 9px no-repeat,#20242b;}
+
+  .field-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;font-size:11px;color:var(--text-muted);}
+  .field-row:last-child{margin-bottom:0;}
+  .field-row input[type="color"]{width:34px;height:24px;border:1px solid var(--border);border-radius:4px;background:none;padding:0;cursor:pointer;}
+  .field-row input[type="range"]{flex:1;accent-color:var(--accent);}
+  .field-row .val{width:32px;text-align:right;color:var(--text-primary);flex-shrink:0;}
+  .field-row select{flex:1;}
+
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-track{background:var(--bg-void);}
+  ::-webkit-scrollbar-thumb{background:#2a2f36;border-radius:5px;}
+
+  /* ---------- Print CSS ---------- */
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    body{background:#fff !important;}
+    #printArea{position:absolute;top:0;left:0;margin:0;}
+    .preview-pane{background:#fff !important;}
+    .preview-scroll{display:block;padding:0;overflow:visible;}
+    #printArea{display:block;width:auto;}
+    #pages{display:block;width:auto;}
+    .paper{
+      width:var(--page-w) !important;
+      height:var(--page-h) !important;
+      min-height:var(--page-h) !important;
+      max-height:var(--page-h) !important;
+      margin:0 !important;
+      box-shadow:none !important;
+      break-after:page !important;
+      page-break-after:always !important;
+      overflow:hidden !important;
+    }
+    .paper:last-child{break-after:auto !important;page-break-after:auto !important;}
+    .page-decoration{display:block !important;}
+    .page-content{overflow:hidden !important;}
+  }
+
+  /* ---------- Export PDF dialog ---------- */
+  .modal-overlay{position:fixed;inset:0;background:rgba(6,7,9,.65);display:flex;align-items:center;justify-content:center;z-index:1000;}
+  .modal-overlay.hidden{display:none;}
+  .export-modal{width:520px;max-width:calc(100vw - 40px);max-height:calc(100vh - 40px);overflow:auto;background:var(--bg-panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .export-modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border-soft);}
+  .export-modal-head h3{margin:0;font-size:14px;color:var(--text-primary);font-weight:600;}
+  .export-modal-close{background:none;border:none;color:var(--text-dim);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:4px;}
+  .export-modal-close:hover{color:var(--text-primary);background:var(--bg-input);}
+  .export-modal-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px;}
+  .export-option{border:1px solid var(--border);border-radius:8px;padding:14px;background:var(--bg-input);}
+  .export-option h4{margin:0 0 4px 0;font-size:13px;color:var(--text-primary);font-weight:600;}
+  .export-option p.export-desc{margin:0 0 4px 0;font-size:11.5px;color:var(--text-muted);}
+  .export-option ul{margin:8px 0 12px 0;padding-left:18px;}
+  .export-option ul li{font-size:11px;color:var(--text-dim);line-height:1.5;}
+  .export-option .btn{width:100%;justify-content:center;display:flex;align-items:center;gap:6px;}
+  .export-status{font-size:11px;color:var(--accent);min-height:14px;margin-top:8px;}
+  .export-status.error{color:#e05a4e;}
+  .export-modal-foot{padding:10px 18px 16px;font-size:10.5px;color:var(--text-dim);line-height:1.5;border-top:1px solid var(--border-soft);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="mark">QFormat</span>
+    <span class="tag">plain text → styled revision sheet</span>
+  </div>
+  <input type="text" id="projectName" placeholder="Untitled document">
+  <select id="projectSelect"><option value="">— Load a saved project —</option></select>
+  <button class="btn small" id="deleteProjectBtn" title="Delete selected project">🗑</button>
+  <div class="spacer"></div>
+  <div class="mode-toggle">
+    <button id="modeRevision" class="active">Revision</button>
+    <button id="modeExam">Exam</button>
+  </div>
+  <button class="btn" id="newBtn">New</button>
+  <button class="btn" id="saveBtn">Save</button>
+  <button class="btn primary" id="pdfBtn">Download PDF</button>
+</div>
+
+<div class="workspace">
+
+  <div class="editor-pane">
+    <div class="pane-label">SOURCE — paste plain questions &amp; answers</div>
+    <textarea id="source" spellcheck="false" placeholder="Paste your questions and answers here..."></textarea>
+    <div class="stats-bar">
+      <span>Questions: <b id="statQ">0</b></span>
+      <span>Words: <b id="statW">0</b></span>
+      <span>Est. pages: <b id="statP">0</b></span>
+    </div>
+  </div>
+
+  <div class="preview-pane">
+    <div class="pane-label">LIVE PREVIEW</div>
+    <div class="preview-scroll">
+      <div id="printArea">
+        <div id="pages"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="inspector-pane">
+    <div class="insp-section help-panel">
+      <h4>How to format</h4>
+      <ul class="help-list">
+        <li><code># Title</code><span class="desc">Document title (first line if no # is used)</span></li>
+        <li><code>## Section</code><span class="desc">Section heading with underline</span></li>
+        <li><code>1. Question text</code><span class="desc">Numbered question — "1)" also works</span></li>
+        <li><code>A) Option one</code><span class="desc">Multiple-choice options, one per line — or inline "A) ... B) ... C) ..."</span></li>
+        <li><code>Answer: text</code><span class="desc">Shown inline (Revision) or moved to Answer Key (Exam)</span></li>
+        <li><code>Note: text</code><span class="desc">Highlighted side note</span></li>
+        <li><code>Key Term: text</code><span class="desc">Small badge, then a line below for its definition</span></li>
+        <li><code>Key Fact: text</code><span class="desc">Highlighted fact box</span></li>
+      </ul>
+      <p class="help-note">Leave a blank line between blocks. Anything else becomes plain paragraph text.</p>
+      <button class="btn copy-example" id="copyExampleBtn">📋 Copy Format Guide</button>
+    </div>
+
+    <div class="insp-section">
+      <h4>Theme</h4>
+      <div class="theme-grid" id="themeGrid"></div>
+    </div>
+
+    <div class="insp-section">
+      <h4>Layout</h4>
+      <div class="layout-grid" id="layoutGrid"></div>
+    </div>
+
+    <div class="insp-section">
+      <h4>Colors</h4>
+      <div class="field-row"><span>Title / Section</span><input type="color" id="cTitle"></div>
+      <div class="field-row"><span>Question</span><input type="color" id="cQuestion"></div>
+      <div class="field-row"><span>Answer</span><input type="color" id="cAnswer"></div>
+      <div class="field-row"><span>Note</span><input type="color" id="cNote"></div>
+    </div>
+
+    <div class="insp-section">
+      <h4>Typography</h4>
+      <div class="field-row"><span>Font</span>
+        <select id="fFont">
+          <option value="'Poppins', sans-serif">Poppins</option>
+          <option value="'Inter', sans-serif">Inter</option>
+          <option value="'Lora', serif">Lora (serif)</option>
+          <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+          <option value="Georgia, serif">Georgia</option>
+        </select>
+      </div>
+      <div class="field-row"><span>Title size</span><input type="range" id="sTitle" min="16" max="40" value="26"><span class="val" id="sTitleVal">26</span></div>
+      <div class="field-row"><span>Question size</span><input type="range" id="sQuestion" min="11" max="24" value="15"><span class="val" id="sQuestionVal">15</span></div>
+      <div class="field-row"><span>Answer size</span><input type="range" id="sAnswer" min="10" max="20" value="13"><span class="val" id="sAnswerVal">13</span></div>
+    </div>
+
+    <div class="insp-section">
+      <h4>Spacing</h4>
+      <div class="field-row"><span>Question gap</span><input type="range" id="sGap" min="8" max="40" value="22"><span class="val" id="sGapVal">22</span></div>
+      <div class="field-row"><span>Line height</span><input type="range" id="sLine" min="12" max="20" value="16"><span class="val" id="sLineVal">1.6</span></div>
+      <div class="field-row"><span>Margins</span>
+        <select id="fMargin">
+          <option value="12mm">Small</option>
+          <option value="18mm" selected>Normal</option>
+          <option value="26mm">Large</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="insp-section">
+      <h4>Page</h4>
+      <div class="field-row"><span>Paper</span>
+        <select id="fPaper">
+          <option value="210,297">A4</option>
+          <option value="216,279">Letter</option>
+          <option value="148,210">A5</option>
+        </select>
+      </div>
+      <div class="field-row"><span>Orientation</span>
+        <select id="fOrient">
+          <option value="portrait">Portrait</option>
+          <option value="landscape">Landscape</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="insp-section">
+      <h4>Page Decoration</h4>
+      <div class="deco-grid" id="decoGrid"></div>
+      <div class="field-row"><span>Color</span><input type="color" id="dColor" value="#0b3c5d"></div>
+      <div class="field-row"><span>Thickness</span><input type="range" id="dThickness" min="0.3" max="3" step="0.1" value="0.8"><span class="val" id="dThicknessVal">0.8mm</span></div>
+      <div class="field-row"><span>Opacity</span><input type="range" id="dOpacity" min="15" max="100" step="5" value="100"><span class="val" id="dOpacityVal">100%</span></div>
+      <div class="field-row"><span>Corner style</span>
+        <select id="dCorner">
+          <option value="square">Square</option>
+          <option value="rounded">Rounded</option>
+          <option value="notched">Notched</option>
+        </select>
+      </div>
+      <div class="field-row"><span>Distance from edge</span><input type="range" id="dDistance" min="2" max="16" step="0.5" value="6"><span class="val" id="dDistanceVal">6mm</span></div>
+      <p class="help-note">The frame always stays within the page margin, so it never overlaps your content.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="modal-overlay hidden" id="exportOverlay">
+  <div class="export-modal">
+    <div class="export-modal-head">
+      <h3>Export PDF</h3>
+      <button class="export-modal-close" id="exportModalClose" title="Close">✕</button>
+    </div>
+    <div class="export-modal-body">
+      <div class="export-option">
+        <h4>Quick PDF</h4>
+        <p class="export-desc">Fast export — image-based PDF</p>
+        <ul>
+          <li>Exports in a few seconds</li>
+          <li>Pixel-perfect match of the current preview</li>
+          <li>Text is not selectable/searchable</li>
+        </ul>
+        <button class="btn primary" id="quickPdfBtn">Export Quick PDF</button>
+        <div class="export-status" id="quickPdfStatus"></div>
+      </div>
+      <div class="export-option">
+        <h4>High Quality PDF</h4>
+        <p class="export-desc">Slower export — sharp, selectable text</p>
+        <ul>
+          <li>Real, selectable and searchable PDF text</li>
+          <li>Vector-sharp borders, decorations and lines at any zoom</li>
+          <li>Requires the local QFormat PDF service to be running</li>
+        </ul>
+        <button class="btn primary" id="hqPdfBtn">Export High Quality PDF</button>
+        <div class="export-status" id="hqPdfStatus"></div>
+      </div>
+    </div>
+    <div class="export-modal-foot">
+      High Quality PDF renders your document in headless Chromium on a small local service. If the export fails, make sure it's running (see <code>qformat-pdf-service</code> — <code>npm install &amp;&amp; npm start</code>).
+    </div>
+  </div>
+</div>
+
+<script>
+const NS = 'qformat:';
+let memoryFallback = null;
+function storageBackend(){
+  if (memoryFallback) return memoryFallback;
+  try{const testKey=NS+'__test__';localStorage.setItem(testKey,'1');localStorage.removeItem(testKey);return localStorage;}
+  catch(e){memoryFallback=memoryFallback||new Map();return memoryFallback;}
+}
+function backendGet(k){const b=storageBackend();return b instanceof Map?(b.has(k)?b.get(k):null):b.getItem(k);}
+function backendSet(k,v){const b=storageBackend();if(b instanceof Map)b.set(k,v);else b.setItem(k,v);}
+function backendDelete(k){const b=storageBackend();if(b instanceof Map)b.delete(k);else b.removeItem(k);}
+function backendKeys(){const b=storageBackend();if(b instanceof Map)return Array.from(b.keys());const out=[];for(let i=0;i<b.length;i++)out.push(b.key(i));return out;}
+window.storage={
+  async get(key,shared){const raw=backendGet(NS+key);if(raw===null||raw===undefined)return null;return{key,value:raw,shared:!!shared};},
+  async set(key,value,shared){backendSet(NS+key,value);return{key,value,shared:!!shared};},
+  async delete(key,shared){backendDelete(NS+key);return{key,deleted:true,shared:!!shared};},
+  async list(prefix,shared){const full=NS+(prefix||'');const keys=backendKeys().filter(k=>k&&k.startsWith(full)).map(k=>k.slice(NS.length));return{keys,prefix,shared:!!shared};}
+};
+
+const THEMES={
+  'academic-blue':{label:'Academic Blue',title:'#0b3c5d',question:'#0077b6',answer:'#0e7c61',note:'#b25400',font:"'Poppins', sans-serif"},
+  'fresh-green':{label:'Fresh Green',title:'#1b4332',question:'#2d6a4f',answer:'#40916c',note:'#774936',font:"'Poppins', sans-serif"},
+  'modern-purple':{label:'Modern Purple',title:'#3c1361',question:'#5b2a86',answer:'#2e7d5b',note:'#a4508b',font:"'Inter', sans-serif"},
+  'warm-study':{label:'Warm Study',title:'#7a2e00',question:'#c1440e',answer:'#8a5a00',note:'#4a2c00',font:"'Lora', serif"},
+  'minimal-black':{label:'Minimal Black',title:'#111111',question:'#222222',answer:'#444444',note:'#666666',font:"'Inter', sans-serif"},
+  'textbook':{label:'Textbook',title:'#1a1a1a',question:'#8b0000',answer:'#1f3d2b',note:'#4a4a4a',font:"'Lora', serif"},
+};
+let activeTheme='academic-blue';
+
+const themeGrid=document.getElementById('themeGrid');
+Object.entries(THEMES).forEach(([key,t])=>{
+  const el=document.createElement('div');
+  el.className='theme-swatch'+(key===activeTheme?' active':'');
+  el.dataset.theme=key;
+  el.innerHTML=`<span class="dots"><span class="dot" style="background:${t.title}"></span><span class="dot" style="background:${t.question}"></span><span class="dot" style="background:${t.answer}"></span></span><span>${t.label}</span>`;
+  el.addEventListener('click',()=>applyTheme(key));
+  themeGrid.appendChild(el);
+});
+
+function applyTheme(key){
+  activeTheme=key;
+  const t=THEMES[key];
+  document.getElementById('cTitle').value=t.title;
+  document.getElementById('cQuestion').value=t.question;
+  document.getElementById('cAnswer').value=t.answer;
+  document.getElementById('cNote').value=t.note;
+  document.getElementById('fFont').value=t.font;
+  document.querySelectorAll('.theme-swatch').forEach(s=>s.classList.toggle('active',s.dataset.theme===key));
+  applyStyleVars();
+}
+
+const LAYOUTS={
+  classic:{label:'Classic',hint:'Clean, minimal'},
+  boxed:{label:'Boxed Cards',hint:'Bordered question cards'},
+  numbered:{label:'Numbered Badge',hint:'Circle number markers'},
+  modern:{label:'Modern',hint:'Left accent bar'},
+  academic:{label:'Academic',hint:'Formal exam style'},
+  compact:{label:'Compact',hint:'Dense, many questions'},
+};
+let activeLayout='classic';
+
+const layoutGrid=document.getElementById('layoutGrid');
+Object.entries(LAYOUTS).forEach(([key,l])=>{
+  const el=document.createElement('div');
+  el.className='layout-swatch'+(key===activeLayout?' active':'');
+  el.dataset.layout=key;
+  el.innerHTML=`<span class="mini"><span></span><span></span><span></span></span><span>${l.label}</span>`;
+  el.addEventListener('click',()=>applyLayout(key));
+  layoutGrid.appendChild(el);
+});
+
+function applyLayout(key){
+  activeLayout=key;
+  document.querySelectorAll('#pages .paper').forEach(page=>{
+    page.className=`paper layout-${key}`;
+  });
+  document.querySelectorAll('.layout-swatch').forEach(s=>s.classList.toggle('active',s.dataset.layout===key));
+  renderNow();
+  scheduleAutosave();
+}
+
+const DECO_STYLES={none:{label:'None'},minimal:{label:'Minimal'},double:{label:'Double Border'},academic:{label:'Academic'},modern:{label:'Modern'},rounded:{label:'Rounded'},corners:{label:'Corner Decorations'}};
+const DECO_FOOTPRINT_FACTOR={none:0,minimal:1,double:1,academic:1.35,modern:1.9,rounded:1,corners:1};
+let activeDeco='none';
+
+const decoGrid=document.getElementById('decoGrid');
+Object.entries(DECO_STYLES).forEach(([key,d])=>{
+  const el=document.createElement('div');
+  el.className='deco-swatch'+(key===activeDeco?' active':'');
+  el.dataset.deco=key;
+  el.innerHTML=`<span class="mini deco-mini-${key}"></span><span>${d.label}</span>`;
+  el.addEventListener('click',()=>{activeDeco=key;syncDecoSwatches();updateDecoration();});
+  decoGrid.appendChild(el);
+});
+function syncDecoSwatches(){document.querySelectorAll('.deco-swatch').forEach(s=>s.classList.toggle('active',s.dataset.deco===activeDeco));}
+
+function clampNum(v,min,max){return Math.max(min,Math.min(max,v));}
+
+function chamferPath(x,y,w,h,cut){
+  const c=Math.max(0,Math.min(cut,w/2,h/2));
+  const x2=x+w,y2=y+h;
+  if(c<=0)return`M${x},${y} H${x2} V${y2} H${x} Z`;
+  return`M${x+c},${y} L${x2-c},${y} L${x2},${y+c} L${x2},${y2-c} L${x2-c},${y2} L${x+c},${y2} L${x},${y2-c} L${x},${y+c} Z`;
+}
+
+function buildDecorationSVG(cfg){
+  const{style,color,opacityPct,thickness:t,distance:d,corner,W,H}=cfg;
+  if(style==='none'||W<=0||H<=0)return'';
+  const opacity=clampNum(opacityPct,0,100)/100;
+  const notchCut=corner==='notched'?Math.max(2.2,t*1.6):0;
+  const roundRx=corner==='rounded'?Math.max(1.4,t*0.9):0;
+  const linejoin=corner==='rounded'?'round':'miter';
+
+  function ring(x,y,w,h,strokeW,extraRx){
+    if(w<=0||h<=0)return'';
+    if(notchCut>0)return`<path d="${chamferPath(x,y,w,h,notchCut)}" fill="none" stroke="${color}" stroke-opacity="${opacity}" stroke-width="${strokeW}" stroke-linejoin="miter"/>`;
+    const rx=extraRx!=null?extraRx:roundRx;
+    return`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="none" stroke="${color}" stroke-opacity="${opacity}" stroke-width="${strokeW}" stroke-linejoin="${linejoin}"/>`;
+  }
+
+  let inner='';
+  switch(style){
+    case'minimal':
+      inner=ring(d+t/2,d+t/2,W-2*d-t,H-2*d-t,t);break;
+    case'double':{const gap=Math.max(1.3,t*0.7);const t2=Math.max(0.3,t*0.55);inner=ring(d+t/2,d+t/2,W-2*d-t,H-2*d-t,t)+ring(d+t+gap+t2/2,d+t+gap+t2/2,W-2*(d+t+gap)-t2,H-2*(d+t+gap)-t2,t2);break;}
+    case'academic':{const tOuter=t*1.25;const gap=Math.max(1.5,t*0.9);const tInner=Math.max(0.3,t*0.4);inner=ring(d+tOuter/2,d+tOuter/2,W-2*d-tOuter,H-2*d-tOuter,tOuter)+ring(d+tOuter+gap+tInner/2,d+tOuter+gap+tInner/2,W-2*(d+tOuter+gap)-tInner,H-2*(d+tOuter+gap)-tInner,tInner);const cs=clampNum(tOuter*3,3.5,7);[[d,d],[W-d-cs,d],[d,H-d-cs],[W-d-cs,H-d-cs]].forEach(([px,py])=>{inner+=`<rect x="${px}" y="${py}" width="${cs}" height="${cs}" fill="${color}" fill-opacity="${opacity}"/>`;});break;}
+    case'modern':{const tt=Math.max(0.3,t*0.55);const barT=t*1.6;inner=ring(d+tt/2,d+tt/2,W-2*d-tt,H-2*d-tt,tt);inner+=`<rect x="${d}" y="${d}" width="${Math.max(0,W-2*d)}" height="${barT}" fill="${color}" fill-opacity="${opacity}"/>`;break;}
+    case'rounded':{const rx=Math.max(5,Math.min(W,H)*0.035);inner=ring(d+t/2,d+t/2,W-2*d-t,H-2*d-t,t,rx);break;}
+    case'corners':{const arm=clampNum(Math.min(W,H)*0.09,10,26);const lc=corner==='rounded'?'round':'butt';const lj=corner==='rounded'?'round':'miter';const corners4=[{x:d,y:d,dx:1,dy:1},{x:W-d,y:d,dx:-1,dy:1},{x:d,y:H-d,dx:1,dy:-1},{x:W-d,y:H-d,dx:-1,dy:-1}];corners4.forEach(c=>{const x2=c.x+c.dx*arm,y3=c.y+c.dy*arm;if(notchCut>0){const nb=Math.max(1.4,t);inner+=`<path d="M${x2},${c.y} L${c.x+c.dx*nb},${c.y} L${c.x},${c.y+c.dy*nb} L${c.x},${y3}" fill="none" stroke="${color}" stroke-opacity="${opacity}" stroke-width="${t}" stroke-linejoin="miter" stroke-linecap="butt"/>`;}else{inner+=`<path d="M${x2},${c.y} L${c.x},${c.y} L${c.x},${y3}" fill="none" stroke="${color}" stroke-opacity="${opacity}" stroke-width="${t}" stroke-linejoin="${lj}" stroke-linecap="${lc}"/>`;}});break;}
+  }
+  return`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
+}
+
+function updateDecoration(){
+  const color=document.getElementById('dColor').value;
+  const thickness=parseFloat(document.getElementById('dThickness').value);
+  const opacityPct=parseFloat(document.getElementById('dOpacity').value);
+  const corner=document.getElementById('dCorner').value;
+  const distance=parseFloat(document.getElementById('dDistance').value);
+
+  document.getElementById('dThicknessVal').textContent=thickness.toFixed(1)+'mm';
+  document.getElementById('dOpacityVal').textContent=Math.round(opacityPct)+'%';
+  document.getElementById('dDistanceVal').textContent=distance.toFixed(1).replace(/\.0$/,'')+'mm';
+
+  const[pw,ph]=document.getElementById('fPaper').value.split(',').map(Number);
+  const orient=document.getElementById('fOrient').value;
+  const W=orient==='portrait'?pw:ph;
+  const H=orient==='portrait'?ph:pw;
+
+  document.querySelectorAll('#pages .page-decoration').forEach(deco=>{
+    deco.style.display=activeDeco==='none'?'none':'block';
+    if(activeDeco!=='none'){
+      deco.innerHTML=buildDecorationSVG({style:activeDeco,color,opacityPct,thickness,distance,corner,W,H});
+    }else{
+      deco.innerHTML='';
+    }
+  });
+
+  const baseLR=parseFloat(document.getElementById('fMargin').value)||18;
+  const baseTop=baseLR+4;
+  const baseBottom=baseLR+2;
+  const factor=DECO_FOOTPRINT_FACTOR[activeDeco]||0;
+  const required=activeDeco==='none'?0:distance+factor*thickness+2;
+
+  root.setProperty('--content-pad-lr',Math.max(baseLR,required)+'mm');
+  root.setProperty('--content-pad-top',Math.max(baseTop,required)+'mm');
+  root.setProperty('--content-pad-bottom',Math.max(baseBottom,required)+'mm');
+
+  document.querySelectorAll('#pages .paper').forEach(page=>{
+    page.style.paddingTop=Math.max(baseTop,required)+'mm';
+    page.style.paddingBottom=Math.max(baseBottom,required)+'mm';
+    page.style.paddingLeft=Math.max(baseLR,required)+'mm';
+    page.style.paddingRight=Math.max(baseLR,required)+'mm';
+  });
+
+  scheduleAutosave();
+}
+
+['dColor','dThickness','dOpacity','dCorner','dDistance'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',()=>{
+    updateDecoration();
+    requestAnimationFrame(()=>{render(parseContent(source.value));updateStats();});
+  });
+});
+
+const root=document.documentElement.style;
+function applyStyleVars(){
+  root.setProperty('--doc-title-color',document.getElementById('cTitle').value);
+  root.setProperty('--doc-section-color',document.getElementById('cTitle').value);
+  root.setProperty('--doc-question-color',document.getElementById('cQuestion').value);
+  root.setProperty('--doc-answer-color',document.getElementById('cAnswer').value);
+  root.setProperty('--doc-note-color',document.getElementById('cNote').value);
+  root.setProperty('--doc-font',document.getElementById('fFont').value);
+  root.setProperty('--doc-title-size',document.getElementById('sTitle').value+'px');
+  root.setProperty('--doc-question-size',document.getElementById('sQuestion').value+'px');
+  root.setProperty('--doc-answer-size',document.getElementById('sAnswer').value+'px');
+  root.setProperty('--doc-gap',document.getElementById('sGap').value+'px');
+  const lh=(document.getElementById('sLine').value/10).toFixed(1);
+  root.setProperty('--doc-line-height',lh);
+
+  document.getElementById('sTitleVal').textContent=document.getElementById('sTitle').value;
+  document.getElementById('sQuestionVal').textContent=document.getElementById('sQuestion').value;
+  document.getElementById('sAnswerVal').textContent=document.getElementById('sAnswer').value;
+  document.getElementById('sGapVal').textContent=document.getElementById('sGap').value;
+  document.getElementById('sLineVal').textContent=lh;
+
+  const[w,h]=document.getElementById('fPaper').value.split(',').map(Number);
+  const orient=document.getElementById('fOrient').value;
+  const W=orient==='portrait'?w:h;
+  const H=orient==='portrait'?h:w;
+  root.setProperty('--page-w',W+'mm');
+  root.setProperty('--page-h',H+'mm');
+  updatePrintPage(W,H,orient);
+  scheduleAutosave();
+}
+
+let printStyleTag=document.createElement('style');
+document.head.appendChild(printStyleTag);
+function updatePrintPage(w,h,orient){printStyleTag.textContent=`@page{size:${w}mm ${h}mm;margin:0;}`;}
+
+['cTitle','cQuestion','cAnswer','cNote','fFont','sTitle','sQuestion','sAnswer','sGap','sLine','fMargin','fPaper','fOrient'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',()=>{
+    applyStyleVars();
+    if(['fMargin','fPaper','fOrient'].includes(id)) updateDecoration();
+  });
+});
+
+const modeRevision=document.getElementById('modeRevision');
+const modeExam=document.getElementById('modeExam');
+modeRevision.addEventListener('click',()=>{document.body.classList.remove('exam-mode');modeRevision.classList.add('active');modeExam.classList.remove('active');renderNow();scheduleAutosave();});
+modeExam.addEventListener('click',()=>{document.body.classList.add('exam-mode');modeExam.classList.add('active');modeRevision.classList.remove('active');renderNow();scheduleAutosave();});
+
+function parseContent(text){
+  const lines=text.split('\n');
+  const blocks=[];
+  let current=null;
+  const push=(block)=>{blocks.push(block);current=block;};
+
+  for(let raw of lines){
+    const line=raw.trim();
+    if(line===''){current=null;continue;}
+    let m;
+    if((m=line.match(/^#\s+(.*)/))){push({type:'title',text:m[1]});continue;}
+    if((m=line.match(/^##\s+(.*)/))){push({type:'section',text:m[1]});continue;}
+    if((m=line.match(/^answer\b\s*:?\s*(.*)/i))){push({type:'answer',text:m[1]});continue;}
+    if((m=line.match(/^note\b\s*:?\s*(.*)/i))){push({type:'note',text:m[1]});continue;}
+    if((m=line.match(/^key\s+term\b\s*[:\-—]?\s*(.*)/i))){push({type:'keyterm',text:m[1]});continue;}
+    if((m=line.match(/^key\s+fact\b\s*:?\s*(.*)/i))){push({type:'keyfact',text:m[1]});continue;}
+    if((m=line.match(/^\d+[\.\)]\s*(.*)/))){push({type:'question',text:m[1],choices:[]});continue;}
+    if(current&&current.type==='question'&&(m=line.match(/^([A-Ea-e\u0623\u0628\u062c\u062f\u0647])[\.\)]\s*(.*)/))){
+      current.choices=current.choices||[];
+      current.choices.push({letter:m[1].toUpperCase(),text:m[2]});
+      continue;
+    }
+    if(current&&['question','answer','note','keyterm','keyfact'].includes(current.type)){
+      current.text+=' '+line;
+    }else if(blocks.length===0){
+      push({type:'title',text:line});
+    }else{
+      push({type:'text',text:line});
+    }
+  }
+
+  let qn=1;
+  blocks.forEach(b=>{
+    if(b.type!=='question')return;
+    b.num=qn++;
+    if(!b.choices||!b.choices.length){
+      const split=splitInlineChoices(b.text);
+      if(split){b.text=split.stem;b.choices=split.choices;}
+    }
+  });
+  return blocks;
+}
+
+function splitInlineChoices(text){
+  const re=/\s([A-Ea-e])[\.\)]\s+/g;
+  const hits=[];
+  let m;
+  while((m=re.exec(text))){hits.push({index:m.index,end:re.lastIndex,letter:m[1].toUpperCase()});}
+  if(hits.length<2)return null;
+  const expected='ABCDE'.slice(0,hits.length).split('');
+  const sequential=hits.every((h,i)=>h.letter===expected[i]);
+  if(!sequential)return null;
+  const stem=text.slice(0,hits[0].index).trim();
+  const choices=hits.map((h,i)=>{const end=i+1<hits.length?hits[i+1].index:text.length;return{letter:h.letter,text:text.slice(h.end,end).trim()};});
+  return{stem,choices};
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function render(blocks){
+  const pagesRoot=document.getElementById('pages');
+  if(!pagesRoot)return;
+  pagesRoot.innerHTML='';
+
+  if(blocks.length===0){
+    const page=createPage();
+    page.querySelector('.page-content').innerHTML='<div class="empty-hint">Paste your questions and answers on the left — QFormat detects titles, sections,<br>questions and answers automatically and renders them here.</div>';
+    updateDecoration();
+    return;
+  }
+
+  const isExam=document.body.classList.contains('exam-mode');
+  const units=[];
+  const answerKey=[];
+  let currentQuestion=null;
+
+  blocks.forEach(b=>{
+    if(b.type==='question'){
+      const questionHtml=buildQuestionHtml(b);
+      currentQuestion={question:b,html:questionHtml};
+      if(isExam){
+        units.push({type:'question',html:questionHtml});
+        currentQuestion={question:b,html:questionHtml};
+      }
+      return;
+    }
+    if(b.type==='answer'){
+      if(isExam){
+        answerKey.push({num:currentQuestion?currentQuestion.question.num:null,text:escapeHtml(b.text||'')});
+      }else{
+        if(currentQuestion){
+          const answerHtml=`<p class="doc-answer"><span class="lbl">Answer:</span> ${escapeHtml(b.text||'')}</p>`;
+          units.push({type:'question',html:`<div class="doc-block">${currentQuestion.html}${answerHtml}</div>`});
+          currentQuestion=null;
+        }else{
+          units.push({type:'answer',html:`<p class="doc-answer"><span class="lbl">Answer:</span> ${escapeHtml(b.text||'')}</p>`});
+        }
+      }
+      return;
+    }
+    if(!isExam&&currentQuestion){
+      units.push({type:'question',html:`<div class="doc-block">${currentQuestion.html}</div>`});
+      currentQuestion=null;
+    }
+    if(b.type==='title'){units.push({type:'title',html:`<h1 class="doc-title">${escapeHtml(b.text||'')}</h1>`});return;}
+    if(b.type==='section'){units.push({type:'section',html:`<div class="doc-section">${escapeHtml(b.text||'')}</div>`});return;}
+    if(b.type==='note'){units.push({type:'note',html:`<div class="doc-note">Note: ${escapeHtml(b.text||'')}</div>`});return;}
+    if(b.type==='keyterm'){units.push({type:'keyterm',html:`<div><span class="doc-keyterm">${escapeHtml(b.text||'')}</span></div>`});return;}
+    if(b.type==='keyfact'){units.push({type:'keyfact',html:`<div class="doc-keyfact"><b>Key fact:</b> ${escapeHtml(b.text||'')}</div>`});return;}
+    units.push({type:'text',html:`<p class="doc-text">${escapeHtml(b.text||'')}</p>`});
+  });
+
+  if(!isExam&&currentQuestion){
+    units.push({type:'question',html:`<div class="doc-block">${currentQuestion.html}</div>`});
+  }
+
+  let page=null;
+  let content=null;
+
+  function ensurePage(){
+    if(!page){
+      page=createPage();
+      content=page.querySelector('.page-content');
+    }
+  }
+
+  ensurePage();
+
+  units.forEach((unit,index)=>{
+    const wrapper=document.createElement('div');
+    wrapper.className='pagination-unit';
+    wrapper.innerHTML=unit.html;
+    content.appendChild(wrapper);
+
+    const availableHeight=getPageContentHeight(page);
+
+    if(content.scrollHeight>availableHeight+1&&content.children.length>1){
+      content.removeChild(wrapper);
+      page=createPage();
+      content=page.querySelector('.page-content');
+      content.appendChild(wrapper);
+    }
+
+    if(unit.type==='section'&&index<units.length-1){
+      const nextUnit=units[index+1];
+      const test=document.createElement('div');
+      test.className='pagination-unit';
+      test.innerHTML=nextUnit.html;
+      content.appendChild(test);
+      if(content.scrollHeight>availableHeight+1){
+        content.removeChild(test);
+        content.removeChild(wrapper);
+        if(content.children.length>0){
+          page=createPage();
+          content=page.querySelector('.page-content');
+        }
+        content.appendChild(wrapper);
+      }else{
+        content.removeChild(test);
+      }
+    }
+  });
+
+  if(isExam&&answerKey.length){
+    page=createPage();
+    content=page.querySelector('.page-content');
+    const heading=document.createElement('div');
+    heading.className='doc-section';
+    heading.textContent='Answer Key';
+    content.appendChild(heading);
+    answerKey.forEach(a=>{
+      const item=document.createElement('p');
+      item.className='doc-answer-item';
+      const num=a.num!=null?`${a.num}. `:'';
+      item.innerHTML=`<b>${num}</b>${a.text}`;
+      if(content.scrollHeight+item.offsetHeight>getPageContentHeight(page)&&content.children.length>1){
+        page=createPage();
+        content=page.querySelector('.page-content');
+      }
+      content.appendChild(item);
+    });
+  }
+
+  updateDecoration();
+}
+
+function buildQuestionHtml(b){
+  let html=`<p class="doc-question"><span class="q-num">${b.num}</span> ${escapeHtml(b.text||'')}</p>`;
+  if(b.choices&&b.choices.length){
+    html+='<ul class="doc-choices">';
+    b.choices.forEach(c=>{
+      html+=`<li><span class="choice-letter">${escapeHtml(c.letter)})</span> ${escapeHtml(c.text)}</li>`;
+    });
+    html+='</ul>';
+  }
+  return html;
+}
+
+function createPage(){
+  const paper=document.createElement('div');
+  paper.className=`paper layout-${activeLayout}`;
+  paper.innerHTML=`<div class="page-decoration" aria-hidden="true"></div><div class="page-content"></div>`;
+  document.getElementById('pages').appendChild(paper);
+  return paper;
+}
+
+function getPageContentHeight(page){
+  const style=getComputedStyle(page);
+  const paddingTop=parseFloat(style.paddingTop)||0;
+  const paddingBottom=parseFloat(style.paddingBottom)||0;
+  return page.clientHeight-paddingTop-paddingBottom;
+}
+
+function updateStats(){
+  const text=source.value;
+  const blocks=parseContent(text);
+  const qCount=blocks.filter(b=>b.type==='question').length;
+  const words=text.trim()?text.trim().split(/\s+/).length:0;
+  const pageCount=document.querySelectorAll('#pages .paper').length||1;
+  document.getElementById('statQ').textContent=qCount;
+  document.getElementById('statW').textContent=words;
+  document.getElementById('statP').textContent=pageCount;
+}
+
+const source=document.getElementById('source');
+function renderNow(){render(parseContent(source.value));updateStats();}
+source.addEventListener('input',()=>{renderNow();scheduleAutosave();});
+
+const FORMAT_GUIDE=`# Title
+Document title (first line if no # is used)
+
+## Section
+Section heading with underline
+
+1. Question text
+Numbered question — "1)" also works
+
+A) Option one
+MCQ options, one per line under a question — or typed inline as "A) ... B) ... C) ..."
+
+Answer: text
+Shown inline (Revision) or moved to Answer Key (Exam)
+
+Note: text
+Highlighted side note
+
+Key Term: text
+Small badge, then a line below for its definition
+
+Key Fact: text
+Highlighted fact box
+
+Leave a blank line between blocks. Anything else becomes plain paragraph text.`;
+
+document.getElementById('copyExampleBtn').addEventListener('click',async()=>{
+  const btn=document.getElementById('copyExampleBtn');
+  try{
+    await navigator.clipboard.writeText(FORMAT_GUIDE);
+    btn.textContent='Copied!';
+    btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='\uD83D\uDCCB Copy Format Guide';btn.classList.remove('copied');},2000);
+  }catch(e){
+    source.value=FORMAT_GUIDE;
+    renderNow();
+    btn.textContent='Loaded into editor';
+    btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='\uD83D\uDCCB Copy Format Guide';btn.classList.remove('copied');},2000);
+  }
+});
+
+/* =========================================================
+   EXPORT PDF — shared setup + Export dialog
+   ========================================================= */
+const pdfBtn=document.getElementById('pdfBtn');
+const exportOverlay=document.getElementById('exportOverlay');
+const exportModalClose=document.getElementById('exportModalClose');
+const quickPdfBtn=document.getElementById('quickPdfBtn');
+const hqPdfBtn=document.getElementById('hqPdfBtn');
+const quickPdfStatus=document.getElementById('quickPdfStatus');
+const hqPdfStatus=document.getElementById('hqPdfStatus');
+
+// Local headless-Chromium PDF service (see qformat-pdf-service/). Not bundled
+// with this file — run it separately for High Quality PDF exports.
+const PDF_SERVICE_URL = "http://localhost:8080/export-pdf";
+
+function setExportStatus(el,text,isError){
+  el.textContent=text||'';
+  el.classList.toggle('error',!!isError);
+}
+
+// Re-renders the preview from the current source and gathers everything both
+// export paths need. Throws if there's nothing to export.
+function prepareExport(){
+  render(parseContent(source.value));
+  updateStats();
+
+  const pages=Array.from(document.querySelectorAll('#pages .paper'));
+  if(!pages.length){throw new Error('There is no content to export.');}
+
+  const[w,h]=document.getElementById('fPaper').value.split(',').map(Number);
+  const orientation=document.getElementById('fOrient').value;
+  const pageWidth=orientation==='portrait'?w:h;
+  const pageHeight=orientation==='portrait'?h:w;
+
+  const rawName=(projectNameInput.value||'document').trim().replace(/[\\/:*?"<>|]+/g,'-');
+  const filename=`${rawName||'document'}.pdf`;
+
+  return{pages,orientation,pageWidth,pageHeight,filename};
+}
+
+pdfBtn.addEventListener('click',()=>{
+  setExportStatus(quickPdfStatus,'');
+  setExportStatus(hqPdfStatus,'');
+  exportOverlay.classList.remove('hidden');
+});
+exportModalClose.addEventListener('click',()=>exportOverlay.classList.add('hidden'));
+exportOverlay.addEventListener('click',(e)=>{if(e.target===exportOverlay)exportOverlay.classList.add('hidden');});
+
+/* ---------- Option 1: Quick PDF (unchanged html2canvas -> JPEG -> jsPDF) ---------- */
+async function runQuickExport(){
+  let cfg;
+  try{cfg=prepareExport();}catch(e){setExportStatus(quickPdfStatus,e.message,true);return;}
+  const{pages,orientation,pageWidth,pageHeight,filename}=cfg;
+
+  const jsPDF=window.jspdf&&window.jspdf.jsPDF;
+  if(!jsPDF){setExportStatus(quickPdfStatus,'jsPDF could not be loaded. Please reload the page and try again.',true);return;}
+
+  const pdf=new jsPDF({orientation,unit:'mm',format:[pageWidth,pageHeight],compress:true});
+
+  const originalText=quickPdfBtn.textContent;
+  quickPdfBtn.disabled=true;
+  hqPdfBtn.disabled=true;
+
+  try{
+    for(let i=0;i<pages.length;i++){
+      const paper=pages[i];
+      setExportStatus(quickPdfStatus,`Generating page ${i+1}/${pages.length}\u2026`);
+
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+
+      const canvas=await html2canvas(paper,{
+        scale:2,
+        useCORS:true,
+        allowTaint:true,
+        backgroundColor:'#ffffff',
+        width:paper.scrollWidth,
+        height:paper.scrollHeight,
+        windowWidth:Math.max(document.documentElement.clientWidth,paper.scrollWidth),
+        windowHeight:Math.max(document.documentElement.clientHeight,paper.scrollHeight)
+      });
+
+      const image=canvas.toDataURL('image/jpeg',0.98);
+
+      if(i>0) pdf.addPage([pageWidth,pageHeight],orientation);
+
+      pdf.addImage(image,'JPEG',0,0,pageWidth,pageHeight,undefined,'FAST');
+    }
+
+    pdf.save(filename);
+    setExportStatus(quickPdfStatus,'Done \u2014 PDF downloaded.');
+  }catch(error){
+    console.error('Quick PDF generation failed:',error);
+    setExportStatus(quickPdfStatus,'PDF generation failed. Check the browser console for details.',true);
+  }finally{
+    quickPdfBtn.disabled=false;
+    hqPdfBtn.disabled=false;
+    quickPdfBtn.textContent=originalText;
+  }
+}
+quickPdfBtn.addEventListener('click',runQuickExport);
+
+/* ---------- Option 2: High Quality PDF (headless Chromium, real text) ---------- */
+// Snapshots the live document (current theme/layout/decoration/colors/fonts are
+// all applied as inline CSS custom properties on <html>, and the rendered
+// .paper pages already live under #printArea) into a standalone HTML string.
+// The existing @media print rules in this file already isolate #printArea and
+// give each .paper a forced page break, so sending this snapshot into headless
+// Chromium's print-to-PDF pipeline reproduces the preview exactly, as real
+// vector/text PDF pages, with zero UI redesign and zero open dialogs.
+function buildPrintSnapshotHTML(){
+  const docClone=document.documentElement.cloneNode(true);
+  docClone.querySelectorAll('script').forEach(s=>s.remove());
+  return '<!DOCTYPE html>\n'+docClone.outerHTML;
+}
+
+async function runHighQualityExport(){
+  let cfg;
+  try{cfg=prepareExport();}catch(e){setExportStatus(hqPdfStatus,e.message,true);return;}
+  const{orientation,pageWidth,pageHeight,filename}=cfg;
+
+  quickPdfBtn.disabled=true;
+  hqPdfBtn.disabled=true;
+  setExportStatus(hqPdfStatus,'Rendering in headless Chromium\u2026');
+
+  try{
+    const html=buildPrintSnapshotHTML();
+
+    const response=await fetch(PDF_SERVICE_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        html,
+        width:`${pageWidth}mm`,
+        height:`${pageHeight}mm`,
+        orientation,
+        filename
+      })
+    });
+
+    if(!response.ok){
+      let msg=`PDF service returned ${response.status}`;
+      try{const err=await response.json();if(err&&err.error)msg=err.error;}catch(_e){}
+      throw new Error(msg);
+    }
+
+    const blob=await response.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    setExportStatus(hqPdfStatus,'Done \u2014 PDF downloaded.');
+  }catch(error){
+    console.error('High Quality PDF generation failed:',error);
+    const offline=error instanceof TypeError;
+    setExportStatus(
+      hqPdfStatus,
+      offline
+        ?'Could not reach the local PDF service on localhost:5174. Start it with "npm start" in qformat-pdf-service/, then try again.'
+        :`High Quality PDF failed: ${error.message}`,
+      true
+    );
+  }finally{
+    quickPdfBtn.disabled=false;
+    hqPdfBtn.disabled=false;
+  }
+}
+hqPdfBtn.addEventListener('click',runHighQualityExport);
+
+const projectNameInput=document.getElementById('projectName');
+const projectSelect=document.getElementById('projectSelect');
+let currentProjectKey=null;
+
+function currentSettings(){
+  return{
+    theme:activeTheme,layout:activeLayout,deco:activeDeco,
+    decoSettings:{color:document.getElementById('dColor').value,thickness:document.getElementById('dThickness').value,opacity:document.getElementById('dOpacity').value,corner:document.getElementById('dCorner').value,distance:document.getElementById('dDistance').value},
+    colors:{title:document.getElementById('cTitle').value,question:document.getElementById('cQuestion').value,answer:document.getElementById('cAnswer').value,note:document.getElementById('cNote').value},
+    font:document.getElementById('fFont').value,
+    sizes:{title:document.getElementById('sTitle').value,question:document.getElementById('sQuestion').value,answer:document.getElementById('sAnswer').value},
+    gap:document.getElementById('sGap').value,line:document.getElementById('sLine').value,margin:document.getElementById('fMargin').value,paper:document.getElementById('fPaper').value,orient:document.getElementById('fOrient').value,
+    mode:document.body.classList.contains('exam-mode')?'exam':'revision',
+  };
+}
+
+function applySettings(s){
+  if(!s)return;
+  activeTheme=s.theme||'academic-blue';
+  applyLayout(s.layout||'classic');
+  activeDeco=s.deco||'none';
+  if(s.decoSettings){
+    document.getElementById('dColor').value=s.decoSettings.color||'#0b3c5d';
+    document.getElementById('dThickness').value=s.decoSettings.thickness||'0.8';
+    document.getElementById('dOpacity').value=s.decoSettings.opacity||'100';
+    document.getElementById('dCorner').value=s.decoSettings.corner||'square';
+    document.getElementById('dDistance').value=s.decoSettings.distance||'6';
+  }
+  syncDecoSwatches();
+  document.getElementById('cTitle').value=s.colors?.title||THEMES[activeTheme].title;
+  document.getElementById('cQuestion').value=s.colors?.question||THEMES[activeTheme].question;
+  document.getElementById('cAnswer').value=s.colors?.answer||THEMES[activeTheme].answer;
+  document.getElementById('cNote').value=s.colors?.note||THEMES[activeTheme].note;
+  document.getElementById('fFont').value=s.font||THEMES[activeTheme].font;
+  document.getElementById('sTitle').value=s.sizes?.title||26;
+  document.getElementById('sQuestion').value=s.sizes?.question||15;
+  document.getElementById('sAnswer').value=s.sizes?.answer||13;
+  document.getElementById('sGap').value=s.gap||22;
+  document.getElementById('sLine').value=s.line||16;
+  document.getElementById('fMargin').value=s.margin||'18mm';
+  document.getElementById('fPaper').value=s.paper||'210,297';
+  document.getElementById('fOrient').value=s.orient||'portrait';
+  document.querySelectorAll('.theme-swatch').forEach(el=>el.classList.toggle('active',el.dataset.theme===activeTheme));
+  if(s.mode==='exam'){document.body.classList.add('exam-mode');modeExam.classList.add('active');modeRevision.classList.remove('active');}
+  else{document.body.classList.remove('exam-mode');modeRevision.classList.add('active');modeExam.classList.remove('active');}
+  applyStyleVars();
+}
+
+async function refreshProjectList(){
+  projectSelect.innerHTML='<option value="">\u2014 Load a saved project \u2014</option>';
+  try{
+    const res=await window.storage.list('project:',false);
+    const keys=res?.keys||[];
+    for(const k of keys){
+      try{
+        const item=await window.storage.get(k,false);
+        if(item){const data=JSON.parse(item.value);const opt=document.createElement('option');opt.value=k;opt.textContent=data.name||k;projectSelect.appendChild(opt);}
+      }catch(e){}
+    }
+  }catch(e){}
+}
+
+document.getElementById('saveBtn').addEventListener('click',async()=>{
+  const name=projectNameInput.value.trim()||'Untitled document';
+  const key=currentProjectKey||('project:'+Date.now());
+  const payload=JSON.stringify({name,content:source.value,settings:currentSettings()});
+  try{await window.storage.set(key,payload,false);currentProjectKey=key;await refreshProjectList();projectSelect.value=key;}catch(e){}
+});
+
+projectSelect.addEventListener('change',async()=>{
+  const key=projectSelect.value;
+  if(!key){currentProjectKey=null;return;}
+  try{
+    const item=await window.storage.get(key,false);
+    if(item){const data=JSON.parse(item.value);currentProjectKey=key;projectNameInput.value=data.name||'';source.value=data.content||'';applySettings(data.settings);renderNow();}
+  }catch(e){}
+});
+
+document.getElementById('deleteProjectBtn').addEventListener('click',async()=>{
+  const key=projectSelect.value;
+  if(!key)return;
+  try{await window.storage.delete(key,false);if(currentProjectKey===key)currentProjectKey=null;await refreshProjectList();}catch(e){}
+});
+
+document.getElementById('newBtn').addEventListener('click',()=>{
+  if(!confirm('Start a new document? Unsaved changes in the editor will be lost unless saved.'))return;
+  currentProjectKey=null;
+  projectSelect.value='';
+  projectNameInput.value='';
+  source.value='';
+  applyTheme('academic-blue');
+  applyLayout('classic');
+  activeDeco='none';syncDecoSwatches();
+  updateDecoration();
+  document.body.classList.remove('exam-mode');
+  modeRevision.classList.add('active');modeExam.classList.remove('active');
+  renderNow();
+});
+
+let autosaveTimer=null;
+function scheduleAutosave(){
+  clearTimeout(autosaveTimer);
+  autosaveTimer=setTimeout(async()=>{try{await window.storage.set('draft',JSON.stringify({content:source.value,settings:currentSettings(),name:projectNameInput.value}),false);}catch(e){}},800);
+}
+
+async function boot(){
+  await document.fonts.ready;
+  applyTheme('academic-blue');
+  applyLayout('classic');
+  activeDeco='none';
+  syncDecoSwatches();
+  let restored=false;
+  try{
+    const draft=await window.storage.get('draft',false);
+    if(draft){const data=JSON.parse(draft.value);if(data.content){source.value=data.content;projectNameInput.value=data.name||'';applySettings(data.settings);restored=true;}}
+  }catch(e){}
+  if(!restored){source.value='';applyStyleVars();}
+  renderNow();
+  updateDecoration();
+  updateStats();
+  refreshProjectList();
+}
+boot();
+</script>
+</body>
+</html>
