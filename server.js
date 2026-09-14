@@ -29,9 +29,13 @@
 
 const express = require('express');
 const cors = require('cors');
+
+process.env.HOME = process.env.HOME || '/tmp';
+process.env.PUPPETEER_CACHE_DIR =
+  process.env.PUPPETEER_CACHE_DIR || '/tmp/puppeteer';
 const puppeteer = require('puppeteer');
 
-const PORT = process.env.PORT ? Number(process.env.PORT) : 5174;
+const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
 const REQUEST_TIMEOUT_MS = process.env.REQUEST_TIMEOUT_MS
   ? Number(process.env.REQUEST_TIMEOUT_MS)
   : 60_000;
