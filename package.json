@@ -1,0 +1,19 @@
+{
+  "name": "qformat-pdf-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Deployable headless-Chromium PDF export service for QFormat's High Quality PDF option (real, selectable vector text instead of a JPEG snapshot). Deploy with the included Dockerfile so it runs online for all users.",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "puppeteer": "^25.11.0"
+  }
+}

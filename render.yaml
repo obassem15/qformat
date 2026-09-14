@@ -1,0 +1,14 @@
+# Render.com deploy blueprint.
+# Push this repo to GitHub, then in Render: New -> Blueprint -> pick the repo.
+# Render will build the Dockerfile and give you a public HTTPS URL like
+# https://qformat-pdf-service.onrender.com — that's what you put in
+# PDF_SERVICE_URL on the frontend (see main README).
+services:
+  - type: web
+    name: qformat-pdf-service
+    env: docker
+    plan: starter # bump if exports are slow/OOM on the free tier
+    healthCheckPath: /health
+    envVars:
+      - key: ALLOWED_ORIGINS
+        sync: false # set to your deployed QFormat URL(s) in the Render dashboard
